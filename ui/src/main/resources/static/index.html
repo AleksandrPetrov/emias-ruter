@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>Сервис маршрутизации</title>
+
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap-theme.min.css" integrity="sha384-rHyoN1iRsVXV4nD0JutlnGaslCJuC7uwjduW9SVrLvRYooPp2bWYgmgJQIXwl/Sp" crossorigin="anonymous">
+    <link href="css/styles.css" rel="stylesheet">
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+
+  	<script>
+  		var baseApiUrl = "";
+  		var parameters = [];
+  		
+  		function basicErrorHandler(xhr, status, error){
+  			console.log(xhr, status, error);
+  			var errorJson = xhr.responseJSON;
+  			$('#modalError .modal-body').empty();
+  			$('#modalError .modal-body').append($('<div>').text(errorJson.message));
+  			
+  			if (errorJson.errors) {
+  				for (var errIndex in errorJson.errors) {
+					var err = errorJson.errors[errIndex];
+  					$('#modalError .modal-body').append($('<div>').text(err.field + " " + err.defaultMessage));
+  				}
+  			}
+
+  			$('#modalError').modal({
+  				backdrop: true,
+  			  	keyboard: true
+  			});
+  		}
+
+	  	function refreshParameters() {
+	  		$.get(baseApiUrl+"/rs/parameter")
+	  			.done(function( data ) {
+		  			parameters = data;
+					$("#parametersTable tbody").empty();
+					for (var paramIndex in data) 
+						addParameterToTable(data[paramIndex]);
+		  		})
+		  		.fail(basicErrorHandler);
+	  		
+	  		refreshRules();
+	  	}
+
+	  	function addParameterToTable(param){
+	  		$("#parametersTable tbody").append(
+				$('<tr>')
+		  			.append($('<td>').text(param.name))
+		  			.append($('<td>').text(param.parameterType))
+		  			.append($('<td>').text(param.description))
+		  			.append($('<td>').text(param.rank))
+		  			.append($('<td>')
+	  					.append($('<a>').click(function (){ onEditParameterClick(param); })
+ 							.append($('<span class="glyphicon glyphicon-edit" aria-hidden=true title="Редактировать">'))
+						)
+						.append($('<a>').click(function (){ onDeleteParameterClick(param); })
+							.append($('<span class="glyphicon glyphicon-remove" aria-hidden=true title="Удалить">'))
+						)
+					)
+	  		);
+	  	}
+
+	  	function refreshRules() {
+	  		$.get(baseApiUrl+"/rs/rule")
+	  			.done(function( data ) {
+		  			$("#rulesTable thead tr").empty();
+		  			$("#rulesTable thead tr").append($('<th>').text("Наименование правила")) 
+		  			for (var paramIndex in parameters){
+		  				var param = parameters[paramIndex];
+		  				$("#rulesTable thead tr")
+		  					.append($('<th>').text(param.name))
+		  			} 
+		  			$("#rulesTable thead tr").append($('<th>').text("Целевой URL"))
+		  			$("#rulesTable thead tr").append($('<th>').text("Действия"))
+	
+					$("#rulesTable tbody").empty();
+		  			for (var dataIndex in data) 
+		  				addRuleToTable(data[dataIndex]);
+		  		})
+		  		.fail(basicErrorHandler);
+	  	}
+	  	
+  		function findParamValueForRule(rule, param){
+  			if (rule)
+	  			for (var index in rule.parameterValues){
+	  				var pv = rule.parameterValues[index];
+	  				if (pv.parameterName == param.name)
+	  					return pv;
+	  			}
+  			return null;
+  		}
+  		
+	  	function addRuleToTable(rule) {
+	  		var tr = $('<tr>');
+	  		$("#rulesTable tbody").append(tr);
+  			tr.append($('<td>').text(rule.name));
+  			
+  			for (var paramIndex in parameters){
+  				var pv = findParamValueForRule(rule, parameters[paramIndex]);
+  				var td = $('<td>');
+  				tr.append(td);
+  				if (pv) {
+	  				if (pv.any)
+	  					td.html('<i>All<i>');
+	  				else {
+	  					for (var valIndex in pv.values) {
+	  						var valDiv = $("<div>");
+	  						td.append(valDiv);
+	  						if (valIndex == 0) {
+	  							if (pv.operationType == 'NE')
+	  								valDiv.append('<i>не равно</i>')
+	  						}
+	  						else 
+	  							valDiv.append('<i>или</i>')
+	  						
+	  						valDiv.append($('<span>').text(pv.values[valIndex]));
+	  					}
+	  				}
+	  			}
+  			} 
+
+  			tr.append($('<td>').text(rule.targetUrl))
+  			tr.append($('<td>')
+ 					.append($('<a>').click(function (){ onEditRuleClick(rule); })
+						.append($('<span class="glyphicon glyphicon-edit" aria-hidden=true title="Редактировать">'))
+				)
+				.append($('<a>').click(function (){ onDeleteRuleClick(rule); })
+					.append($('<span class="glyphicon glyphicon-remove" aria-hidden=true title="Удалить">'))
+				)
+			);
+	  	}
+	  	
+	  	/** Parameter */
+	  	function onAddParameterClick() {
+	  		console.log('onAddParameterClick');
+	  		showParameterModal();
+	  	}
+
+	  	function onEditParameterClick(param) {
+	  		console.log('onEditParameterClick', param);
+	  		showParameterModal(param);
+	  	}
+
+	  	function onDeleteParameterClick(param) {
+	  		console.log('onDeleteParameterClick', param.id);
+	  		$.get(baseApiUrl+"/rs/parameter/delete/"+param.id)
+	  			.done(function( data ) {
+		  			refreshParameters();
+		  		})
+		  		.fail(basicErrorHandler);
+	  	}
+
+	  	function showParameterModal(parameter) {
+	  		$('#modalParameter').modal('show');
+	  		$('#modalParameter .form-control').val("");
+	  		$('#modalParameter select.form-control').val("TEXT");
+	  		
+	  		for (var paramAttrName in parameter) {
+	  			$('#modalParameter .form-control[field='+paramAttrName+']').val(parameter[paramAttrName]);
+		  		console.log("showParameterModal", paramAttrName, parameter[paramAttrName]);
+	  		}
+	  	}
+	  	
+	  	function onSaveParameterClick() {
+	  		var param = {};
+	  		$('#modalParameter .form-control').each(function() {
+	  			var control = $(this);
+	  			console.log("onSaveParameterClick", control.attr("field") , control.val());
+	  			param[control.attr("field")] = control.val();	
+			});
+	  		console.log("onSaveParameterClick", param);
+	  		
+	  		$.ajax({
+	  		  type: "POST",
+	  		  url: baseApiUrl+"/rs/parameter",
+	  		contentType: "application/json; charset=utf-8",
+
+	  		  data: JSON.stringify(param)
+	  		}).done(function( data ) {
+	  			$('#modalParameter').modal('hide');
+	  			refreshParameters();
+	  		})
+	  		.fail(basicErrorHandler);
+	  	}
+	  	
+	  	/** Rule */
+	  	function onAddRuleClick() {
+	  		console.log('onAddRuleClick');
+	  		showRuleModal();
+	  	}
+
+	  	function onEditRuleClick(rule) {
+	  		console.log('onEditRuleClick', rule);
+	  		showRuleModal(rule);
+	  	}
+	  	
+	  	function showRuleModal(rule) {
+	  		$('#modalRule .form-control').val("");
+	  		var paramControls = $('#modalRule #param-controls-table tbody');
+	  		paramControls.empty();
+	  		$('#modalRule').modal('show');
+	  		
+	  		for (var paramIndex in parameters){
+  				var param = parameters[paramIndex];
+  				
+  				paramControls.append($("<tr>").attr("parameter-id", param.id)
+		  			.append($('<td>').append(
+	  					$("<input type=text class='form-control' field='parameterName' disabled>").val(param.name))
+  					)
+		  			.append($('<td>').append(
+	  					$("<input type=checkbox class='form-control' field='any'>"))
+		  			)
+		  			.append($('<td>').append(
+  						$("<select class='form-control' field='operationType'>")
+							.append($('<option>', { value : 'EQ' }).text('равно'))
+							.append($('<option>', { value : 'NE'}).text('не равно'))
+					))
+		  			.append($('<td>').append(
+	  					$("<textarea class='form-control' field='values'>") )
+		  			)
+	  			);
+  				
+  				/* $("#rulesTable thead tr")
+  					.append($('<th>').text(param.name)) */
+  			}
+
+	  		// fill the values
+	  		for (var ruleAttrName in rule) {
+	  			var field = $('#modalRule .form-group .form-control[field='+ruleAttrName+']');
+	  			if (field)
+	  				field.val(rule[ruleAttrName]);
+	  		}
+
+	  		for (var paramIndex in parameters){
+  				var param = parameters[paramIndex];
+  				
+				var pv = findParamValueForRule(rule, param);
+				if (pv) {
+		  			for (var pvAttrName in pv) {
+			  			var field = $("#modalRule #param-controls-table tr[parameter-id='"+param.id+"'] .form-control[field="+pvAttrName+"]");
+			  			//console.log("#modalRule #param-controls-table tr[parameter-id='"+param.id+"'] .form-control[field="+pvAttrName+"]", field);
+			  			if (pvAttrName == 'any')
+			  				field.prop('checked', pv[pvAttrName]);
+			  			if (pvAttrName == 'values')
+			  				field.val(pv[pvAttrName].join('\n'));
+			  			else 
+		  					field.val(pv[pvAttrName]);
+			  		}
+				}
+	  		}
+
+	  		//refreshRules();
+	  	}
+
+	  	function onSaveRuleClick() {
+	  		var rule = {parameterValues : []};
+	  		$('#modalRule .form-group>.form-control').each(function() {
+	  			var control = $(this);
+	  			//console.log("onSaveRuleClick", control.attr("field") , control.val());
+	  			rule[control.attr("field")] = control.val();	
+			});
+	  		
+	  		for (var paramIndex in parameters){
+  				var param = parameters[paramIndex];
+  				var pv = {};
+  				
+  		  		$('#modalRule #param-controls-table tr[parameter-id='+param.id+'] .form-control').each(function() {
+  		  			var control = $(this);
+  		  			//console.log("onSaveRuleClick", control.attr("field"), control.val());
+  		  			if (control.attr("field") == 'any')
+  		  				pv[control.attr("field")] =	control.is(':checked');
+  		  			else if (control.attr("field") == 'values')
+  		  				pv[control.attr("field")] = control.val().split('\n').filter(function(el){ return el.trim() != ''; });
+  		  			else 
+  		  				pv[control.attr("field")] = control.val();	
+  				});
+  		  		
+  		  		rule.parameterValues.push(pv);
+	  		}
+	  		
+	  		console.log("onSaveRuleClick", rule);
+	  		
+	  		$.ajax({
+				type: "POST",
+				url: baseApiUrl+"/rs/rule",
+				contentType: "application/json; charset=utf-8",
+				data: JSON.stringify(rule)
+	  		}).done(function( data ) {
+	  			$('#modalRule').modal('hide');
+	  			refreshRules();
+	  		})
+	  		.fail(basicErrorHandler);
+	  	}
+	  	
+	  	function onDeleteRuleClick(rule) {
+	  		console.log('onDeleteRuleClick', rule.id);
+	  		$.get(baseApiUrl+"/rs/rule/delete/"+rule.id)
+	  			.done(function( data ) {
+	  				refreshRules();
+		  		})
+		  		.fail(basicErrorHandler);
+	  	}
+	  	
+		$(document).ready(function() {
+			$(document).on({
+			    ajaxStart: function() { $("body").addClass("loading");    },
+			     ajaxStop: function() { $("body").removeClass("loading"); }    
+			});
+			
+			refreshParameters();
+			$('#parametersAddBtn').click(onAddParameterClick);
+			$('#ruleAddBtn').click(onAddRuleClick);
+			
+			$('#modalParameter-saveBtn').click(onSaveParameterClick);
+			$('#modalRule-saveBtn').click(onSaveRuleClick);
+			
+		});
+
+  </script>
+  </head>
+  
+
+  <body>
+ 	<nav class="navbar navbar-inverse navbar-fixed-top">
+      <div class="container">
+        <div class="navbar-header">
+          <a class="navbar-brand" href="#">Сервис маршрутизации</a>
+          <a class="navbar-brand" href="/swagger-ui.html#!/route-application-service/findRouteUsingPOST">Тестирование API</a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="container">
+
+      <div>
+        <h2>Параметры 
+        	<a id=parametersAddBtn><span class="glyphicon glyphicon glyphicon-plus" aria-hidden=true title="Добавить"></span></a>
+        </h2>
+        <table id=parametersTable class="table table-striped table-bordered">
+			<thead>
+				<tr>
+					<th>Наименование</th>
+					<th>Тип</th>
+					<th>Описание</th>
+					<th>Приоритет обработки (rank)</th>
+					<th>Действия</th>
+				</tr>
+			</thead>
+			<tbody></tbody>
+		</table>
+      </div>
+      
+      <div>
+        <h2>Правила
+        	<a id=ruleAddBtn><span class="glyphicon glyphicon glyphicon-plus" aria-hidden=true title="Добавить"></span></a>
+       	</h2>
+        <table id=rulesTable class="table table-striped table-bordered">
+			<thead><tr></tr></thead>
+			<tbody></tbody>
+		</table>
+      </div>
+
+    </div><!-- /.container -->
+
+	<div id=modalParameter class="modal fade"  tabindex="-1" role="dialog" aria-labelledby="mySmallModalLabel">
+	  <div class="modal-dialog" role="document">
+	    <div class="modal-content">
+	      <div class="modal-header">
+	        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+	        <h4 class="modal-title" id="exampleModalLabel">Параметр</h4>
+	      </div>
+	      <div class="modal-body">
+	      	<form>
+      		   <div class="form-group hidden">
+	            <label class="control-label">ID:</label>
+	            <input type="text" class="form-control" field="id">
+	          </div>
+	          <div class="form-group">
+	            <label class="control-label">Наименование:</label>
+	            <input type="text" class="form-control" field="name">
+	          </div>
+	          
+	          <div class="form-group">
+	            <label class="control-label">Тип:</label>
+	            <select class="form-control" field="parameterType">
+				  <option>TEXT</option>
+				  <option>BOOLEAN</option>
+				  <option>NUMERIC</option>
+				</select>
+	          </div>
+	          
+   	          <div class="form-group">
+	            <label class="control-label">Описание:</label>
+	           	<textarea class="form-control" field="description"></textarea>
+	          </div>
+	          
+  	          <div class="form-group">
+	            <label class="control-label">Приоритет обработки (rank):</label>
+           	 	<input type="text" class="form-control" field="rank">
+	          </div>
+	        </form>
+	      </div>
+          <div class="modal-footer">
+	        <button type="button" class="btn btn-primary" id="modalParameter-saveBtn">Сохранить</button>
+	        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+	
+	    
+	<div id=modalRule class="modal fade"  tabindex="-1" role="dialog" aria-labelledby="mySmallModalLabel">
+	  <div class="modal-dialog" role="document">
+	    <div class="modal-content">
+	      <div class="modal-header">
+	        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+	        <h4 class="modal-title" id="exampleModalLabel">Правило</h4>
+	      </div>
+	      <div class="modal-body">
+	      	<form>
+      		   <div class="form-group hidden">
+	            <label class="control-label">ID:</label>
+	            <input type="text" class="form-control" field="id">
+	          </div>
+	          <div class="form-group">
+	            <label class="control-label">Наименование правила:</label>
+	            <input type="text" class="form-control" field="name">
+	          </div>
+	          <div class="form-group">
+	            <label class="control-label">Целевой URL:</label>
+	            <input type="text" class="form-control" field="targetUrl">
+	          </div>
+	          <table id=param-controls-table class="table table-striped table-bordered">
+				<thead>
+					<tr>
+						<th>Параметр</th>
+						<th>Любое значение</th>
+						<th>Тип операции</th>
+						<th>Значения<br>(Если значений несколько то вводим каждое в новой строке)</th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+	          </table>
+	        </form>
+	      </div>
+          <div class="modal-footer">
+	        <button type="button" class="btn btn-primary" id="modalRule-saveBtn">Сохранить</button>
+	        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+	    
+	    
+	<div id=modalError class="modal fade"  tabindex="-1" role="dialog" aria-labelledby="mySmallModalLabel">
+	  <div class="modal-dialog" role="document">
+	    <div class="modal-content">
+	      <div class="modal-header">
+	        <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+	        <h4 class="modal-title" id="exampleModalLabel">Ошибка</h4>
+	      </div>
+	      <div class="modal-body"></div>
+          <div class="modal-footer">
+	        <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+	      </div>
+	    </div>
+	  </div>
+	</div>
+	
+	<div class="modalLoader">
+
+  </body>
+</html>

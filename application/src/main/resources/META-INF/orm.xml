@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<entity-mappings xmlns="http://java.sun.com/xml/ns/persistence/orm"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://java.sun.com/xml/ns/persistence/orm http://java.sun.com/xml/ns/persistence/orm_2_0.xsd"
+	version="2.0">
+
+	<entity class="ru.emias.router.domain.entity.Parameter" access="FIELD">
+		<table name="T_PARAMETER" />
+		<attributes>
+			<id name="id">
+				<generated-value strategy="AUTO" />
+			</id>
+			<basic name="name" optional="false">
+				<column name="NAME" length="256" unique="true" />
+			</basic>
+			<basic name="parameterType" optional="false">
+				<column name="PARAMETER_TYPE" />
+				<enumerated>STRING</enumerated>
+			</basic>
+			<basic name="description" optional="true">
+				<column name="DESCRIPTION" length="1024" />
+			</basic>
+			<basic name="rank" optional="true">
+				<column name="RANK" />
+			</basic>
+		</attributes>
+	</entity>
+
+	<entity class="ru.emias.router.domain.entity.Rule" access="FIELD">
+		<table name="T_RULE" />
+		<attributes>
+			<id name="id">
+				<generated-value strategy="AUTO" />
+			</id>
+			<basic name="name" optional="false">
+				<column name="NAME" length="256" />
+			</basic>
+			<basic name="targetUrl" optional="false">
+				<column name="TARGET_URL" length="1024" />
+			</basic>
+			<one-to-many name="parameterValues"
+				target-entity="ru.emias.router.domain.entity.RuleParameterValue"
+				mapped-by="rule" fetch="LAZY">
+				<cascade>
+					<cascade-all />
+				</cascade>
+			</one-to-many>
+		</attributes>
+	</entity>
+
+	<entity class="ru.emias.router.domain.entity.RuleParameterValue"
+		access="FIELD">
+
+		<table name="T_RULE_PARAMETER_VALUE">
+			<unique-constraint>
+				<column-name>RULE_ID</column-name>
+				<column-name>PARAMETER_ID</column-name>
+			</unique-constraint>
+		</table>
+		<attributes>
+			<id name="id">
+				<generated-value strategy="AUTO" />
+			</id>
+			<many-to-one name="rule" optional="false" fetch="LAZY">
+				<join-column name="RULE_ID" />
+			</many-to-one>
+			<many-to-one name="parameter" optional="false" fetch="EAGER">
+				<join-column name="PARAMETER_ID" />
+			</many-to-one>
+			<basic name="any" optional="false">
+				<column name="ANY" />
+			</basic>
+			<basic name="operationType" optional="false">
+				<column name="OPERATION_TYPE" />
+				<enumerated>STRING</enumerated>
+			</basic>
+			<element-collection name="values" fetch="EAGER">
+				<collection-table name="T_RULE_PARAMETER_VALUE_LIST">
+					<join-column name="RULE_PARAMETER_VALUE_ID" />
+				</collection-table>
+			</element-collection>
+		</attributes>
+	</entity>
+
+</entity-mappings>
