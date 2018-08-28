@@ -33,3 +33,50 @@
 
 * выполнить внутри консоли скрипт: application\src\main\resources\db\scripts\initialLoad.sql 
 
+* Проверить что правила загрузилсь можно отправив запрос к сервису маршрутизации
+
+Из консоли
+
+        curl -X POST --header 'Content-Type: application/json' --header 'Accept: application/json' -d '[ \ 
+           { \ 
+             "name": "medicalEntityID", \ 
+             "value": "99" \ 
+           }, \ 
+           { \ 
+             "name": "roleID", \ 
+             "value": "1" \ 
+           },   \ 
+           { \ 
+             "name": "newUI", \ 
+             "value": "true" \ 
+           } \ 
+          \ 
+         ]' 'http://localhost:8888/rs/route'
+
+    
+Или через swagger
+
+    Перейти http://localhost:8888/swagger-ui.html#!/route-application-service/findRouteUsingPOST
+    В body передать
+    
+        [
+          {
+            "name": "medicalEntityID",
+            "value": "99"
+          },
+          {
+            "name": "roleID",
+            "value": "1"
+          },  
+          {
+            "name": "newUI",
+            "value": "true"
+          }
+        ]
+
+В ответ должны получить
+
+        {
+          "targetUrl": "/web/accessPoint/index.api",
+          ....
+        }
